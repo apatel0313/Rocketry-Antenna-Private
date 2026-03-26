@@ -1,9 +1,9 @@
-import pigpio
+#import pigpio
 import time
 import math
 from bisect import bisect_left
 
-pi = pigpio.pi()
+#pi = pigpio.pi()
 PIN = 18
 
 max_pulse = 1250 # Set to pulsewidth corresponding to 90 deg - should be about 45 deg from min
@@ -21,22 +21,43 @@ def build_dict():
             time_altitude_dict[time_from_launch_predicted] = altitude_predicted
         return time_altitude_dict
 
-def get_altitude_at_time(time_keys, t:float):
-    #   Return altitude corresponding to the closest time fig in CSV
-    idx = bisect_left(time_keys, t)
-    if idx == 0:
-        nearest_key = time_keys[0]
-    elif idx == len(time_keys):
-        nearest_key = time_keys[-1]
-    else:
-        before = time_keys[idx - 1]
-        after = time_keys[idx]
-        #   pick whichever is closer to t
-        if t - before <= after - t:
-            nearest_key = before
-        else:
-            nearest_key = after
-    return time_altitude_dict[nearest_key]
+# def get_altitude_at_time(time_keys, t:float):
+#     #   Return altitude corresponding to the closest time fig in CSV
+#     idx = bisect_left(time_keys, t)
+#     if idx == 0:
+#         nearest_key = time_keys[0]
+#     elif idx == len(time_keys):
+#         nearest_key = time_keys[-1]
+#     else:
+#         before = time_keys[idx - 1]
+#         after = time_keys[idx]
+#         #   pick whichever is closer to t
+#         if t - before <= after - t:
+#             nearest_key = before
+#         else:
+#             nearest_key = after
+#     return time_altitude_dict[nearest_key]
+
+def get_altitude_at_time_interpolated(time_keys, time_keys_dict, t:float):
+    if t <= time_keys[0]:
+        return time_altitude_dict[time_keys[0]]
+    if t >= time_keys[-1]:
+        return time_altitude_dict[time_keys[-1]]
+    idx = bisect_left(time_keys, t) # Find the negibborign point
+    t_before = time_keys[idx - 1] #first point
+    alt_before = time_altitude_dict[t_before]
+    t_after = time_keys[idx] #second point
+    alt_after = time_altitude_dict[t_after]
+    #math
+    slope = (alt_after - alt_before)/(t_after - t_before)
+    time_progress = t - t_before
+    alt_interpolated = alt_before + (slope * time_progress)
+
+    return alt_interpolated
+
+
+
+    
 
 
 
@@ -56,7 +77,7 @@ def main():
         time_from_launch = time.time() - launch_time 
 
         try:
-            altitude = get_altitude_at_time(time_keys, time_from_launch)
+            altitude = get_altitude_at_time_interpolated(time_keys, time_altitude_dict, time_from_launch)
         except Exception as e:
             print(f"Lookup error at t={time_from_launch:.3f}: {e}")
             fail_count += 1
@@ -67,7 +88,7 @@ def main():
         angle = round(math.degrees(math.atan(altitude/ground_station_from_pole)),2)
         if altitude != last_altitude:
             pulse = rest_pulse + deg_step_pulse * angle
-            pi.set_servo_pulsewidth(PIN, pulse)                
+            #pi.set_servo_pulsewidth(PIN, pulse)                
             last_altitude = altitude
             print_str = f"T: {time_from_launch:05.2f} | Altitude: {int(altitude):04d} | Angle: {angle:05.2f}"
             print(print_str)  
