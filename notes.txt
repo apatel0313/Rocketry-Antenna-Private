@@ -1,0 +1,2 @@
+in servo_control.py, we are going to need to tweak the min pulsewidth because of the nature of the servo motor, just a self reminder
+to change max_pulse var to (rest_pulse - 500) and tweak rest_pulse accordingly ( likely somewhere around 1780 pulsewidth)
