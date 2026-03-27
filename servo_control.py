@@ -38,7 +38,7 @@ def build_dict():
 #             nearest_key = after
 #     return time_altitude_dict[nearest_key]
 
-def get_altitude_at_time_interpolated(time_keys, time_keys_dict, t:float):
+def get_altitude_at_time_interpolated(time_keys, time_altitude_dict, t:float):
     if t <= time_keys[0]:
         return time_altitude_dict[time_keys[0]]
     if t >= time_keys[-1]:
@@ -65,16 +65,16 @@ def main():
     time_altitude_dict = build_dict()
     time_keys = sorted(time_altitude_dict.keys())
     ground_station_from_pole = 1609.34
-    launch_time = time.time() 
-    time_from_last = 1
-    fail_count=0
-    last_altitude=-1
+    last_print_str = ""
+    launch_time = time.monotonic()
+    fail_count = 0
+    last_altitude = -1
+    last_servo_time = 0.0
+    last_sent_pulse = None
+    servo_interval = 0.02  # 20 ms
     while True:
-        if time.time() - time_from_last > 0.03: # ensures at least 3 ms between loops
-            time_from_last = time.time()
-            time_from_launch = time.time() - launch_time
-            
-        time_from_launch = time.time() - launch_time 
+        now = time.monotonic()
+        time_from_launch = now - launch_time
 
         try:
             altitude = get_altitude_at_time_interpolated(time_keys, time_altitude_dict, time_from_launch)
@@ -85,15 +85,24 @@ def main():
                 break
             continue
 
-        angle = round(math.degrees(math.atan(altitude/ground_station_from_pole)),2)
-        if altitude != last_altitude:
-            pulse = rest_pulse + deg_step_pulse * angle
-            #pi.set_servo_pulsewidth(PIN, pulse)                
+        angle = round(math.degrees(math.atan(altitude/ground_station_from_pole)), 2)
+        pulse = rest_pulse + deg_step_pulse * angle
+
+        if abs(altitude - last_altitude) >= 0.1:
+            # throttle servo updates to once every `servo_interval` seconds
+            if now - last_servo_time >= servo_interval and pulse != last_sent_pulse:
+                #pi.set_servo_pulsewidth(PIN, pulse)
+                last_servo_time = now
+                last_sent_pulse = pulse
+                indicate_servo_update_str = "***"
+            else: indicate_servo_update_str = ""
+
             last_altitude = altitude
-            print_str = f"T: {time_from_launch:05.2f} | Altitude: {int(altitude):04d} | Angle: {angle:05.2f}"
-            print(print_str)  
-        else:
-            pass
+            print_str = f"T: {time_from_launch:05.2f} | Altitude: {int(altitude):05d} | Angle: {angle:05.2f} {indicate_servo_update_str}"
+            if print_str != last_print_str:
+                print(print_str)
+                last_print_str = print_str
+        time.sleep(0.003) # sleep 3ms to avoid eating up CPU power
 
 if __name__ == "__main__":
     main()
