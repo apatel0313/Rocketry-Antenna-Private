@@ -126,6 +126,7 @@ def main():
         alt = get_altitude_at_time_interpolated(t, time_altitude_dict, time_keys)
         output.append({'t': t, 'theta': theta_pred, 'angle_deg': angle_deg, 'alt': alt, 'coeffs': coeffs, 'center': center, 'window_keys': window_keys, 'theta_window': theta_window})
         t += dt_out
+        if t > 5: break
 
     # Compute derivatives analytically
     for item in output:

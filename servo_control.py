@@ -55,12 +55,6 @@ def get_altitude_at_time_interpolated(time_keys, time_altitude_dict, t:float):
 
     return alt_interpolated
 
-
-
-    
-
-
-
 def main():
     time_altitude_dict = build_dict()
     time_keys = sorted(time_altitude_dict.keys())
