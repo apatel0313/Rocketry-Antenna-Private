@@ -3,9 +3,10 @@ import select
 import time
 import math
 from bisect import bisect_left
-import pigpio
+import lgpio
 
-pi = pigpio.pi()
+# Initialize lgpio on gpiochip 0 (use 4 if you are on Raspberry Pi 5)
+h = lgpio.gpiochip_open(0)
 
 try:
     import tty
@@ -188,7 +189,7 @@ def main():
                 last_altitude = altitude
                 # Show reversing status
                 rev_str = "[REVERSING] " if direction == -1.0 else ""
-                pi.set_servo_pulsewidth(PIN, pulse)
+                lgpio.tx_servo(h, PIN, int(pulse))
                 print_str = f"{rev_str}T:{sim_time:05.2f} |Alt:{int(altitude):05d} |Ang:{angle_deg:05.2f} |Om:{math.degrees(omega):.2f} |Al:{alpha:.3f} |Trq:{torque:.4f} |{status} {indicate_servo_update_str}"
                 
                 if print_str != last_print_str:
@@ -204,6 +205,8 @@ def main():
                 time.sleep(0.01) # Yield CPU if finished standard run without quitting
 
     finally:
+        # Cleanup
+        lgpio.gpiochip_close(h)
         if old_settings and has_tty:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         print("\nProcess Completed.")
