@@ -6,7 +6,10 @@ from bisect import bisect_left
 import lgpio
 
 # Initialize lgpio on gpiochip 0 (use 4 if you are on Raspberry Pi 5)
-h = lgpio.gpiochip_open(0)
+h = lgpio.gpiochip_open(4)
+
+# Configure GPIO 18 as output for servo control
+lgpio.gpio_claim_output(h, 18)
 
 try:
     import tty
