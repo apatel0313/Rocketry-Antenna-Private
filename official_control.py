@@ -3,6 +3,9 @@ import select
 import time
 import math
 from bisect import bisect_left
+import pigpio
+
+pi = pigpio.pi()
 
 try:
     import tty
@@ -185,7 +188,7 @@ def main():
                 last_altitude = altitude
                 # Show reversing status
                 rev_str = "[REVERSING] " if direction == -1.0 else ""
-                
+                pi.set_servo_pulsewidth(PIN, pulse)
                 print_str = f"{rev_str}T:{sim_time:05.2f} |Alt:{int(altitude):05d} |Ang:{angle_deg:05.2f} |Om:{math.degrees(omega):.2f} |Al:{alpha:.3f} |Trq:{torque:.4f} |{status} {indicate_servo_update_str}"
                 
                 if print_str != last_print_str:
