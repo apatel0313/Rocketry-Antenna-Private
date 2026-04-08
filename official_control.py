@@ -28,6 +28,8 @@ PIN = 18
 max_pulse = 1250 # Set to pulsewidth corresponding to 90 deg - should be about 45 deg from min
 rest_pulse = 1750 # Set to pulsewidth corresponding to 0 deg - should be about 45 deg max
 deg_step_pulse = 5.56 # set to the pulsewidth corresponding to a 1 degree increase
+min_pulse = 1000  # Absolute minimum servo PWM (microseconds)
+max_servo_pulse = 2000  # Absolute maximum servo PWM (microseconds)
 
 def build_dict():
     data = {}
@@ -107,6 +109,11 @@ def main():
     last_servo_time = 0.0
     last_sent_pulse = None
     servo_interval = 0.02
+    pulse_dead_zone = 10  # Only send servo command if pulse changes by >10µs (1.8 degrees)
+    
+    # Smoothing for angle (low-pass filter)
+    smoothed_angle_deg = 0.0
+    angle_smooth_factor = 0.3  # 0.0-1.0: lower = more smoothing
     
     if has_tty:
         fd = sys.stdin.fileno()
@@ -141,36 +148,64 @@ def main():
             lookup_time = min(csv_time, time_keys[-1])
 
             try:
-                # 1. Altitude & Angle logic (from servo_control.py)
+                # Get altitude and compute desired angle/pulse
                 altitude = get_altitude_at_time_interpolated(time_keys, time_altitude_dict, lookup_time)
                 angle_deg = round(math.degrees(math.atan(altitude/GROUND_STATION_FROM_POLE)), 2)
-                pulse = rest_pulse - deg_step_pulse * angle_deg
                 
-                # 2. Omega, Alpha, Torque logic (from alphatest_csv.py)
-                # Compute polynomial dynamics based on real-time rolling window
-                window_start = lookup_time - window_s / 2
-                window_end = lookup_time + window_s / 2
-                window_keys = [tk for tk in time_keys if window_start <= tk <= window_end]
+                # Apply smoothing to angle to reduce jitter
+                smoothed_angle_deg = (1 - angle_smooth_factor) * smoothed_angle_deg + angle_smooth_factor * angle_deg
+                
+                pulse = rest_pulse - deg_step_pulse * smoothed_angle_deg
+                pulse = max(min_pulse, min(pulse, max_servo_pulse))
+                
+                # Check if servo should be commanded
+                should_send = False
+                if now - last_servo_time >= servo_interval:
+                    if last_sent_pulse is None or abs(pulse - last_sent_pulse) >= pulse_dead_zone:
+                        should_send = True
+                
+                # Only compute physics and print if servo is being sent
+                if should_send:
+                    # 2. Omega, Alpha, Torque logic (from alphatest_csv.py)
+                    # Compute polynomial dynamics based on real-time rolling window
+                    window_start = lookup_time - window_s / 2
+                    window_end = lookup_time + window_s / 2
+                    window_keys = [tk for tk in time_keys if window_start <= tk <= window_end]
 
-                if len(window_keys) < degree + 1:
-                    # Fallback to nearest points if window too small
-                    idx = bisect_left(time_keys, lookup_time)
-                    num_needed = degree + 1
-                    start = max(0, idx - num_needed // 2)
-                    end = min(len(time_keys), start + num_needed)
-                    window_keys = time_keys[start:end]
+                    if len(window_keys) < degree + 1:
+                        # Fallback to nearest points if window too small
+                        idx = bisect_left(time_keys, lookup_time)
+                        num_needed = degree + 1
+                        start = max(0, idx - num_needed // 2)
+                        end = min(len(time_keys), start + num_needed)
+                        window_keys = time_keys[start:end]
 
-                if len(window_keys) >= degree + 1:
-                    theta_window = [math.atan(time_altitude_dict[tk] / GROUND_STATION_FROM_POLE) for tk in window_keys]
-                    coeffs = fit_polynomial(window_keys, theta_window, lookup_time, degree)
-                    omega = coeffs[1] if len(coeffs) > 1 else 0.0
-                    alpha = 2 * coeffs[2] if len(coeffs) > 2 else 0.0
-                else:
-                    omega = 0.0
-                    alpha = 0.0
+                    if len(window_keys) >= degree + 1:
+                        theta_window = [math.atan(time_altitude_dict[tk] / GROUND_STATION_FROM_POLE) for tk in window_keys]
+                        coeffs = fit_polynomial(window_keys, theta_window, lookup_time, degree)
+                        omega = coeffs[1] if len(coeffs) > 1 else 0.0
+                        alpha = 2 * coeffs[2] if len(coeffs) > 2 else 0.0
+                    else:
+                        omega = 0.0
+                        alpha = 0.0
 
-                torque = MOMENT_OF_INERTIA * alpha
-                status = "OK" if abs(torque) <= MAX_TORQUE else "EXCEEDS"
+                    torque = MOMENT_OF_INERTIA * alpha
+                    status = "OK" if abs(torque) <= MAX_TORQUE else "EXCEEDS"
+                    
+                    # Option 1: Only send servo if torque is safe
+                    if abs(torque) <= MAX_TORQUE:
+                        last_servo_time = now
+                        last_sent_pulse = pulse
+                        lgpio.tx_servo(h, PIN, int(pulse))
+                        
+                        # Print data only for sent commands
+                        last_altitude = altitude
+                        rev_str = "[REVERSING] " if direction == -1.0 else ""
+                        print_str = f"{rev_str}T:{sim_time:05.2f} |Alt:{int(altitude):05d} |Ang:{angle_deg:05.2f} |Smo:{smoothed_angle_deg:05.2f} |Om:{math.degrees(omega):.2f} |Al:{alpha:.3f} |Trq:{torque:.4f} |{status}"
+                        
+                        if print_str != last_print_str:
+                            print(print_str + "\r")
+                            last_print_str = print_str
 
             except Exception as e:
                 print(f"Error at t={lookup_time:.3f}: {e}\r")
@@ -178,26 +213,6 @@ def main():
                 if fail_count > 5:
                     break
                 continue
-
-            # Update servo and print if altitude moves or we are reversing continuously
-            if abs(altitude - last_altitude) >= 0.1 or direction == -1.0:
-                if now - last_servo_time >= servo_interval and pulse != last_sent_pulse:
-                    # pi.set_servo_pulsewidth(PIN, pulse) # Uncomment in hardware
-                    last_servo_time = now
-                    last_sent_pulse = pulse
-                    lgpio.tx_servo(h, PIN, int(pulse))
-                    indicate_servo_update_str = "***"
-                else:
-                    indicate_servo_update_str = ""
-
-                last_altitude = altitude
-                # Show reversing status
-                rev_str = "[REVERSING] " if direction == -1.0 else ""
-                print_str = f"{rev_str}T:{sim_time:05.2f} |Alt:{int(altitude):05d} |Ang:{angle_deg:05.2f} |Om:{math.degrees(omega):.2f} |Al:{alpha:.3f} |Trq:{torque:.4f} |{status} {indicate_servo_update_str}"
-                
-                if print_str != last_print_str:
-                    print(print_str + "\r")
-                    last_print_str = print_str
             
             time.sleep(0.003)
             
