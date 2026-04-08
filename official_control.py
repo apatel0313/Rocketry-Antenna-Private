@@ -141,7 +141,7 @@ def main():
                 # 1. Altitude & Angle logic (from servo_control.py)
                 altitude = get_altitude_at_time_interpolated(time_keys, time_altitude_dict, lookup_time)
                 angle_deg = round(math.degrees(math.atan(altitude/GROUND_STATION_FROM_POLE)), 2)
-                pulse = rest_pulse + deg_step_pulse * angle_deg
+                pulse = rest_pulse - deg_step_pulse * angle_deg
                 
                 # 2. Omega, Alpha, Torque logic (from alphatest_csv.py)
                 # Compute polynomial dynamics based on real-time rolling window
@@ -182,6 +182,7 @@ def main():
                     # pi.set_servo_pulsewidth(PIN, pulse) # Uncomment in hardware
                     last_servo_time = now
                     last_sent_pulse = pulse
+                    lgpio.tx_servo(h, PIN, int(pulse))
                     indicate_servo_update_str = "***"
                 else:
                     indicate_servo_update_str = ""
@@ -189,7 +190,6 @@ def main():
                 last_altitude = altitude
                 # Show reversing status
                 rev_str = "[REVERSING] " if direction == -1.0 else ""
-                lgpio.tx_servo(h, PIN, int(pulse))
                 print_str = f"{rev_str}T:{sim_time:05.2f} |Alt:{int(altitude):05d} |Ang:{angle_deg:05.2f} |Om:{math.degrees(omega):.2f} |Al:{alpha:.3f} |Trq:{torque:.4f} |{status} {indicate_servo_update_str}"
                 
                 if print_str != last_print_str:
