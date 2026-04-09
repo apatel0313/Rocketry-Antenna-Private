@@ -10,9 +10,10 @@ GROUND_STATION_FROM_POLE = 1609.34  # horizontal distance in meters
 
 # Servo constants
 PIN = 18
-max_pulse = 1250  # pulsewidth corresponding to 90 deg
-rest_pulse = 1750  # pulsewidth corresponding to 0 deg
-deg_step_pulse = 5.56  # pulsewidth per degree
+min_pulse = 500     # pulsewidth corresponding to -90 deg
+max_pulse = 2500    # pulsewidth corresponding to 90 deg
+rest_pulse = 1500   # pulsewidth corresponding to 0 deg
+deg_step_pulse = 11.11  # pulsewidth per degree (2000μs / 180°)
 servo_interval = 0.02  # 20 ms between servo updates
 
 # Polynomial fitting parameters
@@ -232,7 +233,7 @@ def main():
                         angle_deg = round(math.degrees(theta_pred), 2)
                     
                     # Command servo if angle changed
-                    if last_angle is None or abs(angle_deg - last_angle) >= 0.3:
+                    if last_angle is None or abs(angle_deg - last_angle) >= 0.15:
                         if now - last_servo_time >= servo_interval:
                             pulse = rest_pulse - deg_step_pulse * angle_deg
                             duty_cycle = (pulse / 20000) * 100
