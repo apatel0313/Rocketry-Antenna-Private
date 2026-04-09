@@ -136,7 +136,6 @@ def main():
     time_altitude_dict = build_dict()
     time_keys = sorted(time_altitude_dict.keys())
     
-    launch_time = time.monotonic()
     fail_count = 0
     last_servo_time = 0.0
     last_sent_pulse = None
@@ -153,6 +152,11 @@ def main():
     # Initialize GPIO chip for servo control
     h = lgpio.gpiochip_open(0)
     lgpio.gpio_claim_output(h, PIN)
+    
+    print("Setup complete. Press ENTER to begin servo control...")
+    input()
+    
+    launch_time = time.monotonic()  # Reset launch time after user ready
     
     try:
         while True:
