@@ -1,7 +1,7 @@
 import math
 import time
 from bisect import bisect_left
-# import lgpio
+import lgpio
 
 # Constants
 MOMENT_OF_INERTIA = 0.2   # kg*m^2
@@ -149,8 +149,8 @@ def main():
     max_torque_session = 0.0  
     
     # Initialize GPIO chip for servo control
-    # h = lgpio.gpiochip_open(0)
-    # lgpio.gpio_claim_output(h, PIN)
+    h = lgpio.gpiochip_open(0)
+    lgpio.gpio_claim_output(h, PIN)
     
     # FIX 1: Pre-calculate the exact starting angle so the servo doesn't leap on startup
     initial_alt = get_altitude_at_time_interpolated(time_keys, time_altitude_dict, 0)
@@ -238,7 +238,7 @@ def main():
                     
                     pulse = rest_pulse - deg_step_pulse * commanded_angle
                     duty_cycle = (pulse / 20000) * 100
-                    # lgpio.tx_pwm(h, PIN, 50, duty_cycle)
+                    lgpio.tx_pwm(h, PIN, 50, duty_cycle)
                     
                     last_servo_time = now
                     
@@ -266,7 +266,7 @@ def main():
     except KeyboardInterrupt:
         print("\nShutdown requested by user.")
     finally:
-        # lgpio.gpiochip_close(h)
+        lgpio.gpiochip_close(h)
         if COMPUTE_DIAGNOSTICS:
             print(f"Max torque during session: {max_torque_session:.4f} Nm")
         print("Servo control finished.")
