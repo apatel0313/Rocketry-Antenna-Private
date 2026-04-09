@@ -1,6 +1,7 @@
 import math
 import time
 from bisect import bisect_left
+import lgpio
 
 # Constants
 MOMENT_OF_INERTIA = 0.2   # kg*m^2
@@ -149,6 +150,9 @@ def main():
     current_center = None
     max_torque_session = 0.0  # Track maximum torque observed during session
     
+    # Initialize GPIO chip for servo control
+    h = lgpio.gpiochip_open(0)
+    
     try:
         while True:
             now = time.monotonic()
@@ -222,7 +226,7 @@ def main():
                     if last_angle is None or abs(angle_deg - last_angle) >= 0.01:
                         if now - last_servo_time >= servo_interval:
                             pulse = rest_pulse + deg_step_pulse * angle_deg
-                            # pi.set_servo_pulsewidth(PIN, pulse)  # commented: no pigpio on dev machine
+                            lgpio.tx_pwm(h, PIN, 50, pulse)
                             last_servo_time = now
                             last_sent_pulse = pulse
                             
@@ -252,6 +256,7 @@ def main():
     except KeyboardInterrupt:
         print("\nShutdown requested by user.")
     finally:
+        lgpio.gpiochip_close(h)
         if COMPUTE_DIAGNOSTICS:
             print(f"Max torque during session: {max_torque_session:.4f} Nm")
         print("Servo control finished.")
