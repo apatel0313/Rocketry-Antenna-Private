@@ -21,7 +21,7 @@ POLYNOMIAL_DEGREE = 4
 DT_OUT = 0.02  # output/analysis interval
 
 # Diagnostic/debug mode - set to False to disable torque, omega calculations for reduced CPU usage
-COMPUTE_DIAGNOSTICS = True
+COMPUTE_DIAGNOSTICS = False
 
 
 def build_dict():
