@@ -227,7 +227,8 @@ def main():
                     if last_angle is None or abs(angle_deg - last_angle) >= 0.01:
                         if now - last_servo_time >= servo_interval:
                             pulse = rest_pulse - deg_step_pulse * angle_deg
-                            lgpio.tx_pwm(h, PIN, 50, pulse)
+                            duty_cycle = (pulse / 20000) * 100
+                            lgpio.tx_pwm(h, PIN, 50, duty_cycle)
                             last_servo_time = now
                             last_sent_pulse = pulse
                             
