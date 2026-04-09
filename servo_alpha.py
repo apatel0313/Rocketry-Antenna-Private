@@ -153,6 +153,10 @@ def main():
     h = lgpio.gpiochip_open(0)
     lgpio.gpio_claim_output(h, PIN)
     
+    # Set servo to rest position
+    rest_duty_cycle = (rest_pulse / 20000) * 100
+    lgpio.tx_pwm(h, PIN, 50, rest_duty_cycle)
+    
     print("Setup complete. Press ENTER to begin servo control...")
     input()
     
