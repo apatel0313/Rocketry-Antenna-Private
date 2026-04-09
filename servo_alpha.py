@@ -14,7 +14,8 @@ min_pulse = 500     # pulsewidth corresponding to -90 deg
 max_pulse = 2500    # pulsewidth corresponding to 90 deg
 rest_pulse = 1500   # pulsewidth corresponding to 0 deg
 deg_step_pulse = 11.11  # pulsewidth per degree (2000μs / 180°)
-servo_interval = 0.02  # 20 ms between servo updates
+servo_interval = 0.10  # 100 ms between servo updates (was 20ms)
+max_angle_rate = 0.5  # max degrees per servo update to limit torque
 
 # Polynomial fitting parameters
 WINDOW_S = 5  # 2 second window for smoothing
@@ -232,10 +233,18 @@ def main():
                         theta_pred = sum(current_coeffs[k] * (tau ** k) for k in range(POLYNOMIAL_DEGREE + 1))
                         angle_deg = round(math.degrees(theta_pred), 2)
                     
-                    # Command servo if angle changed
+                    # Command servo if angle changed significantly
                     if last_angle is None or abs(angle_deg - last_angle) >= 0.15:
                         if now - last_servo_time >= servo_interval:
-                            pulse = rest_pulse - deg_step_pulse * angle_deg
+                            # Apply slew rate limiting to avoid high torque
+                            if last_angle is None:
+                                commanded_angle = angle_deg
+                            else:
+                                angle_change = angle_deg - last_angle
+                                angle_change = max(-max_angle_rate, min(max_angle_rate, angle_change))
+                                commanded_angle = last_angle + angle_change
+                            
+                            pulse = rest_pulse - deg_step_pulse * commanded_angle
                             duty_cycle = (pulse / 20000) * 100
                             lgpio.tx_pwm(h, PIN, 50, duty_cycle)
                             last_servo_time = now
@@ -248,12 +257,12 @@ def main():
                                            f"Torque:{torque:+.4f}Nm [{torque_status}] ***")
                             else:
                                 print_str = (f"T:{time_from_launch:05.2f} | Alt:{altitude:5.1f}m | "
-                                           f"Angle:{angle_deg:05.2f}° Pulse:{pulse} ***")
+                                           f"Angle:{angle_deg:05.2f}° → {commanded_angle:05.2f}° Pulse:{pulse} ***")
                             if print_str != last_print_str:
                                 print(print_str)
                                 last_print_str = print_str
                         
-                        last_angle = angle_deg
+                        last_angle = commanded_angle
                 except Exception as e:
                     print(f"Angle calculation error at t={time_from_launch:.3f}: {e}")
             
