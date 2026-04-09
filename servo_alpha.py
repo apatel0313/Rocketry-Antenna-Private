@@ -16,9 +16,9 @@ deg_step_pulse = 5.56  # pulsewidth per degree
 servo_interval = 0.02  # 20 ms between servo updates
 
 # Polynomial fitting parameters
-WINDOW_S = 2  # 2 second window for smoothing
-POLYNOMIAL_DEGREE = 4
-DT_OUT = 0.02  # output/analysis interval
+WINDOW_S = 5  # 2 second window for smoothing
+POLYNOMIAL_DEGREE = 2
+DT_OUT = 0.1  # output/analysis interval
 
 # Diagnostic/debug mode - set to False to disable torque, omega calculations for reduced CPU usage
 COMPUTE_DIAGNOSTICS = False
@@ -224,7 +224,7 @@ def main():
                         angle_deg = round(math.degrees(theta_pred), 2)
                     
                     # Command servo if angle changed
-                    if last_angle is None or abs(angle_deg - last_angle) >= 0.01:
+                    if last_angle is None or abs(angle_deg - last_angle) >= 0.3:
                         if now - last_servo_time >= servo_interval:
                             pulse = rest_pulse - deg_step_pulse * angle_deg
                             duty_cycle = (pulse / 20000) * 100
