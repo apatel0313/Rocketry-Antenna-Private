@@ -247,7 +247,7 @@ def main():
                                            f"Torque:{torque:+.4f}Nm [{torque_status}] ***")
                             else:
                                 print_str = (f"T:{time_from_launch:05.2f} | Alt:{altitude:5.1f}m | "
-                                           f"Angle:{angle_deg:05.2f}° ***")
+                                           f"Angle:{angle_deg:05.2f}° Pulse:{pulse} ***")
                             if print_str != last_print_str:
                                 print(print_str)
                                 last_print_str = print_str
